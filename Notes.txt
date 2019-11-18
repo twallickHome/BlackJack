@@ -1,0 +1,6 @@
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 8081).OwningProcess -Force
+
+Using the Go Delve Debugger from the command line
+
+dlv debug ../client
+c
