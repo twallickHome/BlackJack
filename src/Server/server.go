@@ -1,31 +1,31 @@
 package main
 
 import (
+	
 	"encoding/json"
 	"fmt"
 	"os"
 
 	//"io/ioutil"
 	//"log"
-	"math/rand"
+	"packages/gamedata"
+	"packages/deck"
+	"packages/services"
 	"net/http"
-	"time"
-	"gamedata"
 	//"html/template"
 	//"regexp"
 	//"errors"
 )
 
-
-var deck  []gamedata.Card        //Holds an unshuffled deck of cards
-var cardsInPlay []gamedata.Card  //hold a record of cards removed from deck
+var deckOfCards []gamedata.Card //Holds an unshuffled deck of cards
+var cardsInPlay []gamedata.Card //hold a record of cards removed from deck
 var gd = gamedata.GameData{}    //Persistant game data
-var port string        //Holds port #
+var port string                 //Holds port #
 var gameOver bool = true
 
+
 func removeDuplicates(elements []int) []int {
-	
-	
+
 	// Use map to record duplicates as we find them.
 	encountered := map[int]bool{}
 	result := []int{}
@@ -143,77 +143,6 @@ func checkForWinner(playerHighestScore int, dealerHighestScore int) (int, string
 	return win, player
 }
 
-//Calculate score
-func calculateScore(h []gamedata.Card) []int {
-	//Calculate dealer score first value
-
-	//get number of aces in hand
-
-	cardValue := 0
-	countAces := 0
-	var score []int = nil
-
-	for i := 0; i < len(h); i++ {
-		if isAce(h[i]) == true {
-			countAces++
-		} else {
-			cardValue += h[i].Value
-		}
-	}
-
-	fmt.Println("Card Value: ", cardValue)
-	if countAces > 0 {
-
-		score = calculateAces(cardValue, score, countAces)
-
-	} else {
-		score = append(score, cardValue)
-
-	}
-
-	score = removeDuplicates(score)
-
-	fmt.Println("score: ", score)
-	return score
-}
-
-//Determine if card is an ace
-func isAce(c gamedata.Card) bool {
-	out := false
-	if c.Value == 0 {
-		out = true
-	}
-	return out
-}
-
-//draw a card from the deck
-func drawCard(numberOfCards int) []gamedata.Card {
-	//fmt.Println("new hand ********")
-	//.Println("Deck Before", deck[0:5])
-
-	var c []gamedata.Card
-	c = make([]gamedata.Card, numberOfCards, numberOfCards)
-
-	for i := 0; i < numberOfCards; i++ {
-		c[i] = deck[i]
-	}
-
-	//deck = append(deck[0:numberOfCards])
-	//c := deck[0:numberOfCards]
-
-	//fmt.Println("card drawn: ", c)
-
-	//Remove card from deck
-	deck = append(deck[:0], deck[numberOfCards:]...)
-
-	//fmt.Println("Deck After", deck[0:5])
-	//fmt.Println("card drawn: ", c)
-
-	//Update the size of the deck
-	gd.DeckSize = len(deck)
-	return c
-}
-
 //Sends game data back to client
 func postJSONResponse(w http.ResponseWriter, r *http.Request) {
 
@@ -234,11 +163,11 @@ func postJSONResponse(w http.ResponseWriter, r *http.Request) {
 	w.Write(outJSON)
 }
 
-//Shuffles a new deck of cards
+//Shuffles a new deckOfCards of cards
 func shuffleHandler(w http.ResponseWriter, r *http.Request) {
 
 	if gameOver == false {
-		gd.Message = "Game is still in progress\nCan't shuffle the deck"
+		gd.Message = "Game is still in progress\nCan't shuffle the deckOfCards"
 		postJSONResponse(w, r)
 		return
 	}
@@ -246,12 +175,15 @@ func shuffleHandler(w http.ResponseWriter, r *http.Request) {
 	//Reset Game data
 	gd = gamedata.GameData{}
 
-	//Shuffle a new deck
-	deck = nil
+	//Shuffle a new deckOfCards
+	deckOfCards = nil
 	buildDeck()
-	shuffleDeck()
 
-	gd.DeckSize = len(deck)
+	
+	deck.ShuffleDeck(deckOfCards)
+	
+	
+	gd.DeckSize = len(deckOfCards)
 	gd.Message = "Deck is shuffled"
 	postJSONResponse(w, r)
 
@@ -377,81 +309,16 @@ func showHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
-	//Check to see if deck is large enough to play with
-	if len(deck) <= 10 {
-		gd.Message = "Not enough cards in deck.\nPlease shuffle the deck"
-		postJSONResponse(w, r)
-		return
-	}
-
-	//Check for game over condition
-	if gameOver == true {
-		gameOver = false
-	} else {
-		gd.Message = "Game is still in progress\nCan't start a new game"
-		postJSONResponse(w, r)
-		return
-	}
-
-	fmt.Println("new game")
-	//Initialize a new game
-
-	//Draw 2 cards for player 1
-	player := drawCard(2)
-	gd.PlayerHand = append(player)
-	fmt.Println("Player drew: ", gd.PlayerHand)
-
-	//Draw 2 cards for the dealer
-	//Second card is fA up
-	dealer := drawCard(2)
-	dealer[1].FaceDown = false
-	gd.DealerHand = append(dealer)
-	fmt.Println("Dealer drew: ", gd.DealerHand)
-
-	// TEST:
-	//need to re-engineer scoring multiple aces
-	//calculateScore is off if there are 2 or more aces in hand
-	//2 aces can be 2 , 12, 22
-	//gd.DealerHand = []gamedata.gamedata.Card{{0, "A", "D", false}, {9, "9", "S", false}}
-	//gd.DealerHand = []gamedata.gamedata.Card{{0, "A", "D", false}, {0, "A", "S", false}}
-	//gd.DealerHand = []gamedata.gamedata.Card{{0, "A", "D", false}, {0, "A", "S", false}, {0, "A", "H", false}}
-	//gd.DealerHand = []gamedata.gamedata.Card{{0, "A", "D", false}, {0, "A", "D", false}, {0, "A", "S", false}, {0, "A", "H", false}}
-
-	//Get current score
-	gd.DealerScore = calculateScore(gd.DealerHand)
-	fmt.Println("DealerScore: ", gd.DealerScore)
-
-	gd.PlayerScore = calculateScore(gd.PlayerHand)
-	fmt.Println("PlayerScore: ", gd.PlayerScore)
-
-	//test
-	//gd.DealerScore = []int{11, 21}
-	//gd.PlayerScore=[]int{19}
-
-	playerHighestScore, dealerHighestScore := getHighestScore()
-
-	//check for a winner
-	win, p := checkForWinner(playerHighestScore, dealerHighestScore)
-	if win != 4 {
-		gameOver = true
-		gd.Message = p
-
-	} else {
-		gd.Message = "Starting new game"
-	}
-
-	//POST back to client
+	services.NewGame(w,r,deckOfCards,gd,gameOver)
 	postJSONResponse(w, r)
 }
 
 func main() {
 
-	
-	
 	if len(os.Args) >= 2 {
 		port = os.Args[1]
 	} else {
-		port = "8081"
+		port = "8090"
 	}
 
 	gameOver = true
@@ -462,12 +329,15 @@ func main() {
 	http.HandleFunc("/show", showHandler)
 	http.HandleFunc("/shuffle", shuffleHandler)
 
-	err := http.ListenAndServe(":"+port, nil)
+	//err := http.ListenAndServe(":"+port, nil)
+	err := http.ListenAndServe(":8081", nil)
 
 	if err != nil {
 		fmt.Println(err) // Ugly debug output
 
 	}
+
+	
 
 }
 
@@ -478,69 +348,63 @@ func main() {
 //Creates an unshuffled deck of cards
 func buildDeck() {
 	//Add s
-	deck = append(deck, gamedata.Card{0, "A", "S", true})
-	deck = append(deck, gamedata.Card{2, "2", "S", true})
-	deck = append(deck, gamedata.Card{3, "3", "S", true})
-	deck = append(deck, gamedata.Card{4, "4", "S", true})
-	deck = append(deck, gamedata.Card{5, "5", "S", true})
-	deck = append(deck, gamedata.Card{6, "6", "S", true})
-	deck = append(deck, gamedata.Card{7, "7", "S", true})
-	deck = append(deck, gamedata.Card{8, "8", "S", true})
-	deck = append(deck, gamedata.Card{9, "9", "S", true})
-	deck = append(deck, gamedata.Card{10, "10", "S", true})
-	deck = append(deck, gamedata.Card{10, "J", "S", true})
-	deck = append(deck, gamedata.Card{10, "Q", "S", true})
-	deck = append(deck, gamedata.Card{10, "K", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{0, "A", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{2, "2", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{3, "3", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{4, "4", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{5, "5", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{6, "6", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{7, "7", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{8, "8", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{9, "9", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "10", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "J", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "Q", "S", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "K", "S", true})
 
 	//Add H
-	deck = append(deck, gamedata.Card{0, "A", "H", true})
-	deck = append(deck, gamedata.Card{2, "2", "H", true})
-	deck = append(deck, gamedata.Card{3, "3", "H", true})
-	deck = append(deck, gamedata.Card{4, "4", "H", true})
-	deck = append(deck, gamedata.Card{5, "5", "H", true})
-	deck = append(deck, gamedata.Card{6, "6", "H", true})
-	deck = append(deck, gamedata.Card{7, "7", "H", true})
-	deck = append(deck, gamedata.Card{8, "8", "H", true})
-	deck = append(deck, gamedata.Card{9, "9", "H", true})
-	deck = append(deck, gamedata.Card{10, "10", "H", true})
-	deck = append(deck, gamedata.Card{10, "J", "H", true})
-	deck = append(deck, gamedata.Card{10, "Q", "H", true})
-	deck = append(deck, gamedata.Card{10, "K", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{0, "A", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{2, "2", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{3, "3", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{4, "4", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{5, "5", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{6, "6", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{7, "7", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{8, "8", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{9, "9", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "10", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "J", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "Q", "H", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "K", "H", true})
 
 	//Add C
-	deck = append(deck, gamedata.Card{0, "A", "C", true})
-	deck = append(deck, gamedata.Card{2, "2", "C", true})
-	deck = append(deck, gamedata.Card{3, "3", "C", true})
-	deck = append(deck, gamedata.Card{4, "4", "C", true})
-	deck = append(deck, gamedata.Card{5, "5", "C", true})
-	deck = append(deck, gamedata.Card{6, "6", "C", true})
-	deck = append(deck, gamedata.Card{7, "7", "C", true})
-	deck = append(deck, gamedata.Card{8, "8", "C", true})
-	deck = append(deck, gamedata.Card{9, "9", "C", true})
-	deck = append(deck, gamedata.Card{10, "10", "C", true})
-	deck = append(deck, gamedata.Card{10, "J", "C", true})
-	deck = append(deck, gamedata.Card{10, "Q", "C", true})
-	deck = append(deck, gamedata.Card{10, "K", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{0, "A", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{2, "2", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{3, "3", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{4, "4", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{5, "5", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{6, "6", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{7, "7", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{8, "8", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{9, "9", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "10", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "J", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "Q", "C", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "K", "C", true})
 
 	//Add D
-	deck = append(deck, gamedata.Card{0, "A", "D", true})
-	deck = append(deck, gamedata.Card{2, "2", "D", true})
-	deck = append(deck, gamedata.Card{3, "3", "D", true})
-	deck = append(deck, gamedata.Card{4, "4", "D", true})
-	deck = append(deck, gamedata.Card{5, "5", "D", true})
-	deck = append(deck, gamedata.Card{6, "6", "D", true})
-	deck = append(deck, gamedata.Card{7, "7", "D", true})
-	deck = append(deck, gamedata.Card{8, "8", "D", true})
-	deck = append(deck, gamedata.Card{9, "9", "D", true})
-	deck = append(deck, gamedata.Card{10, "10", "D", true})
-	deck = append(deck, gamedata.Card{10, "J", "D", true})
-	deck = append(deck, gamedata.Card{10, "Q", "D", true})
-	deck = append(deck, gamedata.Card{10, "K", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{0, "A", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{2, "2", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{3, "3", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{4, "4", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{5, "5", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{6, "6", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{7, "7", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{8, "8", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{9, "9", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "10", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "J", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "Q", "D", true})
+	deckOfCards = append(deckOfCards, gamedata.Card{10, "K", "D", true})
 
-}
-
-//Shuffles the deck
-func shuffleDeck() {
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
 }
