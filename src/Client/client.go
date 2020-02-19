@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"strconv"
-	"gamedata"
+	"packages/gamedata"
 	// "math/rand"
 	// "time"
 	//"html/template"
