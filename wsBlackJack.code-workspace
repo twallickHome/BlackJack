@@ -4,5 +4,7 @@
 			"path": "C:\\_Projects\\GOLang\\BlackJack"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
 }
