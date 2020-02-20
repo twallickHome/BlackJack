@@ -14,29 +14,10 @@ import (
 	"strings"
 	"strconv"
 	"packages/gamedata"
-	// "math/rand"
-	// "time"
-	//"html/template"
-	//"regexp"
-	//"errors"
+	
 )
 
-// //Definition of a single card
-// type card struct {
-// 	Value    int
-// 	Name     string
-// 	Suit     string
-// 	FaceDown bool
-// }
 
-// type gameData struct {
-// 	DeckSize int
-// 	DealerHand  []card
-// 	DealerScore []int
-// 	PlayerHand  []card
-// 	PlayerScore []int
-// 	Message     string
-// }
 
 var deck []gamedata.Card            //Holds a deck of cards
 var gd = gamedata.GameData{}         //Persistant game data
@@ -255,7 +236,7 @@ func main() {
 			reader := bufio.NewReader(os.Stdin)
 			char, _, err := reader.ReadRune()
 			if err != nil {
-				fmt.Println(err)
+				//fmt.Println(err)
 			} else {
 				mainGUI(char)
 			}

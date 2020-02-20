@@ -1,20 +1,14 @@
 package main
 
 import (
-	
 	"encoding/json"
 	"fmt"
 	"os"
 
-	//"io/ioutil"
-	//"log"
-	"packages/gamedata"
-	"packages/deck"
-	"packages/services"
 	"net/http"
-	//"html/template"
-	//"regexp"
-	//"errors"
+	"packages/gamedata"
+	"packages/services"
+	
 )
 
 var deckOfCards []gamedata.Card //Holds an unshuffled deck of cards
@@ -22,23 +16,10 @@ var cardsInPlay []gamedata.Card //hold a record of cards removed from deck
 var gd = gamedata.GameData{}    //Persistant game data
 var port string                 //Holds port #
 
-
-//Dealer draws
-func dealerDraw() {
-	dealerDraw := deck.DrawCard(1,deckOfCards,gd)
-	gd.DealerHand = append(dealerDraw, gd.PlayerHand...)
-
-	//Get current score
-	gd.DealerScore =gamedata.CalculateScore(gd.DealerHand)
-	fmt.Println("DealerScore: ", gd.DealerScore)
-
-}
-
-
 //Sends game data back to client
 func postJSONResponse(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("Transmit Game Data: ", gd)
+	
 	//Now it’s time to prepare our response by setting up a weatherData structure.
 	//We could try fetching the data from a weather service, but for the purpose of demonstrating JSON handling, let’s just use some mock-up data.
 
@@ -56,90 +37,34 @@ func postJSONResponse(w http.ResponseWriter, r *http.Request) {
 }
 
 //Shuffles a new deckOfCards of cards
-func shuffleHandler(w http.ResponseWriter, r *http.Request){
-	gd,deckOfCards= services.ShuffleDeck(w,r,deckOfCards,gd)
+func shuffleHandler(w http.ResponseWriter, r *http.Request) {
+	gd, deckOfCards = services.ShuffleDeck(w, r, deckOfCards, gd)
 	postJSONResponse(w, r)
 
 }
-	
 
+//Player draws a card
 func hitHandler(w http.ResponseWriter, r *http.Request) {
-	gd= services.HitMe(w,r,gd)
+	gd, deckOfCards = services.HitMe(w, r, deckOfCards, gd)
 	postJSONResponse(w, r)
 }
 
+//player stays
 func stayHandler(w http.ResponseWriter, r *http.Request) {
-	if gd.GameOver == true {
-		gd.Message = "Game is over...Start a new game"
-		postJSONResponse(w, r)
-		return
-	}
-	//fmt.Println("stay")
-	gd.Message = "You are staying"
-	//fmt.Println("Game Data: ", gd)
 
-	//test
-	//gd.DealerScore = []int{19, 29}
-	//gd.PlayerScore=[]int{19}
-
-	playerHighestScore, dealerHighestScore :=gamedata.GetHighestScore(gd)
-
-	//Dealers turn
-	condition := true
-	for ok := true; ok; ok = condition {
-		//determine dealers highest score
-
-		//a little PAI
-		//Check if dealer should draw or stay
-
-		//compare player score with dealer
-		//Whos ahead
-
-		if dealerHighestScore > playerHighestScore {
-			gd.Message = "Dealer WINS!!!"
-			gd.GameOver = true
-			condition = false
-			break
-		} else if dealerHighestScore < playerHighestScore {
-			dealerDraw()
-
-		} else if dealerHighestScore <= 15 {
-			dealerDraw()
-		}
-
-		playerHighestScore, dealerHighestScore =gamedata.GetHighestScore(gd)
-
-		//check for a winner
-		win, p :=gamedata.CheckForWinner(playerHighestScore, dealerHighestScore)
-		if win != 4 {
-			gd.GameOver = true
-			gd.Message = p
-			gd.GameOver = true
-			condition = false
-
-		}
-		//Check for push only on dealers turn
-		if playerHighestScore == dealerHighestScore {
-			gd.GameOver = true
-			gd.Message = "It's a push"
-			gd.GameOver = true
-			condition = false
-
-		}
-	} //for ok := true; ok; ok = condition
-
-	deck.ShowAllCards(gd)
-
+	gd, deckOfCards = services.Stay(w, r, gd, deckOfCards)
 	postJSONResponse(w, r)
 }
 
+//Show player hand
 func showHandler(w http.ResponseWriter, r *http.Request) {
-	gd=services.ShowHand(w,r,gd)
+	gd = services.ShowHand(w, r, gd)
 	postJSONResponse(w, r)
 }
 
+//Starts a new game from an allready shuffled deck
 func newHandler(w http.ResponseWriter, r *http.Request) {
-	gd = services.NewGame(w,r,deckOfCards,gd)
+	gd,deckOfCards = services.NewGame(w, r, deckOfCards, gd)
 	postJSONResponse(w, r)
 }
 
@@ -148,7 +73,7 @@ func main() {
 	if len(os.Args) >= 2 {
 		port = os.Args[1]
 	} else {
-		port = "8090"
+		port = "8081"
 	}
 
 	gd.GameOver = true
@@ -159,19 +84,13 @@ func main() {
 	http.HandleFunc("/show", showHandler)
 	http.HandleFunc("/shuffle", shuffleHandler)
 
-	//err := http.ListenAndServe(":"+port, nil)
-	err := http.ListenAndServe(":8081", nil)
-
+	err := http.ListenAndServe(":"+port, nil)
+	
 	if err != nil {
 		fmt.Println(err) // Ugly debug output
 
 	}
 
-	
-
 }
 
-//********************************************************************
-//    support functions
-//********************************************************************
 

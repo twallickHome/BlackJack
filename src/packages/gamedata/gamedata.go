@@ -1,7 +1,7 @@
 package gamedata
 
 import (
-	"fmt"	
+		
 )
 
 //Contents of this package are
@@ -46,7 +46,7 @@ func CalculateScore(h []Card) []int {
 		}
 	}
 
-	fmt.Println("Card Value: ", cardValue)
+	
 	if countAces > 0 {
 
 		score = calculateAces(cardValue, score, countAces)
@@ -58,7 +58,7 @@ func CalculateScore(h []Card) []int {
 
 	score = removeDuplicates(score)
 
-	fmt.Println("score: ", score)
+	
 	return score
 }
 

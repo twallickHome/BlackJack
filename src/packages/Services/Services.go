@@ -10,13 +10,12 @@ import (
 func NewGame(w http.ResponseWriter,
 	r *http.Request,
 	deckOfCards []gamedata.Card,
-	gd gamedata.GameData) gamedata.GameData{
+	gd gamedata.GameData) (gamedata.GameData,[]gamedata.Card){
 
 	//Check to see if deckOfCards is large enough to play with
 	if len(deckOfCards) <= 10 {
 		gd.Message = "Not enough cards in deckOfCards.\nPlease shuffle the deckOfCards"
-		//postJSONResponse(w, r)
-		return gd
+		return gd,deckOfCards
 	}
 
 	//Check for game over condition
@@ -24,20 +23,19 @@ func NewGame(w http.ResponseWriter,
 		gd.GameOver = false
 	} else {
 		gd.Message = "Game is still in progress\nCan't start a new game"
-		//postJSONResponse(w, r)
-		return gd
+		return gd,deckOfCards
 	}
 
 	
 	//Initialize a new game
 
 	//Draw 2 cards for player 1
-	player := deck.DrawCard(2, deckOfCards, gd)
+	gd,player,deckOfCards := deck.DrawCard(2, deckOfCards, gd)
 	gd.PlayerHand = append(player)
 	
 	//Draw 2 cards for the dealer
 	//Second card is face up
-	dealer := deck.DrawCard(2, deckOfCards, gd)
+	gd,dealer,deckOfCards := deck.DrawCard(2, deckOfCards, gd)
 	dealer[1].FaceDown = false
 	gd.DealerHand = append(dealer)
 	
@@ -70,7 +68,7 @@ func NewGame(w http.ResponseWriter,
 	} else {
 		gd.Message = "Starting new game"
 	}
-	return gd
+	return gd,deckOfCards
 }
 
 //ShuffleDeck Create deck and shuffle it
@@ -119,15 +117,16 @@ func ShowHand(w http.ResponseWriter,
 //HitMe give the player a card
 func HitMe(w http.ResponseWriter,
 	r *http.Request,
-	gd gamedata.GameData) (gamedata.GameData){
+	deckOfCards []gamedata.Card,
+	gd gamedata.GameData) (gamedata.GameData,[]gamedata.Card){
 
 	if gd.GameOver == true {
 		gd.Message = "Game is over... Start a new game"
-		return gd
+		return gd,deckOfCards
 	}
 
 	//Draw a card
-	playerDraw :=deck.DrawCard(1,deckOfCards,gd)
+	gd,playerDraw,deckOfCards :=deck.DrawCard(1,deckOfCards,gd)
 	gd.PlayerHand = append(playerDraw, gd.PlayerHand...)
 	
 	//Get current score
@@ -141,8 +140,79 @@ func HitMe(w http.ResponseWriter,
 	if win != 4 {
 		gd.GameOver = true
 		gd.Message = p
-
+		deck.ShowAllCards(gd)
 	} else {
 		gd.Message = "Here is your card"
 	}
+	return gd,deckOfCards
 }
+
+//Stay Player stays
+func Stay(w http.ResponseWriter,
+	r *http.Request,
+	gd gamedata.GameData,
+	deckOfCards []gamedata.Card) (gamedata.GameData,[]gamedata.Card){
+	
+		if gd.GameOver == true {
+		gd.Message = "Game is over...Start a new game"
+		
+		return gd,deckOfCards
+	}
+	
+	gd.Message = "You are staying"
+	
+
+	//test
+	//gd.DealerScore = []int{19, 29}
+	//gd.PlayerScore=[]int{19}
+
+	playerHighestScore, dealerHighestScore :=gamedata.GetHighestScore(gd)
+
+	//Dealers turn
+	condition := true
+	for ok := true; ok; ok = condition {
+		//determine dealers highest score
+
+		//a little AI
+		//Check if dealer should draw or stay
+
+		//compare player score with dealer
+		//Whos ahead
+
+		if dealerHighestScore >= playerHighestScore {
+			gd.Message = "Dealer WINS!!!"
+			gd.GameOver = true
+			condition = false
+			break
+		} else if dealerHighestScore < playerHighestScore {
+			gd,deckOfCards=deck.DealerDraw(gd,deckOfCards)
+
+		} else if dealerHighestScore <= 15 {
+			gd,deckOfCards=deck.DealerDraw(gd,deckOfCards)
+		}
+
+		playerHighestScore, dealerHighestScore =gamedata.GetHighestScore(gd)
+
+		//check for a winner
+		win, p :=gamedata.CheckForWinner(playerHighestScore, dealerHighestScore)
+		if win != 4 {
+			gd.GameOver = true
+			gd.Message = p
+			gd.GameOver = true
+			condition = false
+
+		}
+		//Check for push only on dealers turn
+		if playerHighestScore == dealerHighestScore {
+			gd.GameOver = true
+			gd.Message = "It's a push"
+			gd.GameOver = true
+			condition = false
+
+		}
+	} //for ok := true; ok; ok = condition
+
+	gd=deck.ShowAllCards(gd)
+	return gd,deckOfCards
+	}
+

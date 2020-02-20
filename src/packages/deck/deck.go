@@ -82,12 +82,12 @@ func ShuffleDeck(deck  []gamedata.Card) {
 }
 
 //DrawCard Draws a card from a shuffled deck
+//returns: the cards drawn and the modified deck
 func DrawCard(numberOfCards int,
 	deckOfCards []gamedata.Card,
-	gd gamedata.GameData) []gamedata.Card {
-	//fmt.Println("new hand ********")
-	//.Println("Deck Before", deck[0:5])
-
+	gd gamedata.GameData)(gamedata.GameData,[]gamedata.Card,[]gamedata.Card) {
+	
+	//Create a card
 	var c []gamedata.Card
 	c = make([]gamedata.Card, numberOfCards, numberOfCards)
 
@@ -95,25 +95,31 @@ func DrawCard(numberOfCards int,
 		c[i] = deckOfCards[i]
 	}
 
-	//deckOfCards = append(deckOfCards[0:numberOfCards])
-	//c := deckOfCards[0:numberOfCards]
-
-	//fmt.Println("card drawn: ", c)
-
 	//Remove card from deckOfCards
 	deckOfCards = append(deckOfCards[:0], deckOfCards[numberOfCards:]...)
-
-	//fmt.Println("deckOfCards After", deckOfCards[0:5])
-	//fmt.Println("card drawn: ", c)
-
+	
 	//Update the size of the deckOfCards
 	gd.DeckSize = len(deckOfCards)
 
-	return c
+	return gd,c, deckOfCards
+}
+
+//DealerDraw Dealer draws
+func DealerDraw(gd gamedata.GameData,
+	deckOfCards []gamedata.Card) (gamedata.GameData,[]gamedata.Card){
+
+	gd,dealerDraw,deckOfCards := DrawCard(1,deckOfCards,gd)
+	gd.DealerHand = append(dealerDraw, gd.PlayerHand...)
+
+	//Get current score
+	gd.DealerScore =gamedata.CalculateScore(gd.DealerHand)
+	
+	return gd ,deckOfCards
+
 }
 
 //ShowAllCards Shows the hand of both players
-func ShowAllCards(gd gamedata.GameData) {
+func ShowAllCards(gd gamedata.GameData)(gamedata.GameData) {
 	//show all cards
 	for i := 0; i < len(gd.DealerHand); i++ {
 		gd.DealerHand[i].FaceDown = false
@@ -122,4 +128,6 @@ func ShowAllCards(gd gamedata.GameData) {
 	for i := 0; i < len(gd.PlayerHand); i++ {
 		gd.PlayerHand[i].FaceDown = false
 	}
+
+	return gd
 }
